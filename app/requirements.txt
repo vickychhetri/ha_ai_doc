@@ -7,8 +7,14 @@ chromadb
 PyPDF2
 python-multipart
 requests
-sentence-transformers  # For Option 2 (Local Open-Source Model)
-openai                 # For Option 1 (OpenAI Embeddings)
+sentence-transformers
+openai
 mysql-connector-python
 pydantic[email]
 sqlalchemy
+python-docx
+python-pptx
+pandas
+openpyxl
+pillow
+pytesseract

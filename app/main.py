@@ -9,6 +9,13 @@ import mysql.connector
 import random
 import string
 
+
+from docx import Document
+from pptx import Presentation
+import pandas as pd
+import pytesseract
+from PIL import Image
+
 app = FastAPI(title="Cerebras RAG AI Assistant")
 client = Cerebras(api_key=os.environ.get("CEREBRAS_API_KEY"))
 
@@ -24,6 +31,44 @@ def chunk_text(text, chunk_size=500):
 # ----------------------------
 # Upload file (user-specific)
 # ----------------------------
+# @app.post("/upload-file")
+# async def upload_file(
+#     user_id: str = Form(...), 
+#     file: UploadFile = File(...)
+# ):
+#     """
+#     Upload a file for a specific user, extract text, chunk it, and store embeddings.
+#     """
+#     # Ensure storage directory exists
+#     storage_dir = f"app/file_storage/{user_id}"
+#     os.makedirs(storage_dir, exist_ok=True)
+
+#     # Save file
+#     file_id = str(uuid.uuid4())
+#     file_path = os.path.join(storage_dir, f"{file_id}_{file.filename}")
+#     with open(file_path, "wb") as f:
+#         f.write(await file.read())
+
+#     # Extract text
+#     text = ""
+#     if file.filename.endswith(".pdf"):
+#         reader = PdfReader(file_path)
+#         text = " ".join([page.extract_text() for page in reader.pages if page.extract_text()])
+#     else:
+#         with open(file_path, "r", errors="ignore") as f:
+#             text = f.read()
+
+#     # Chunk + store (user-specific)
+#     chunks = chunk_text(text)
+#     add_document(user_id, file_id, chunks, source=file.filename)
+
+#     return {
+#         "message": "File uploaded and indexed",
+#         "file_id": file_id,
+#         "source": file.filename,
+#         "user_id": user_id
+#     }
+
 @app.post("/upload-file")
 async def upload_file(
     user_id: str = Form(...), 
@@ -31,6 +76,7 @@ async def upload_file(
 ):
     """
     Upload a file for a specific user, extract text, chunk it, and store embeddings.
+    Supports PDF, TXT, DOCX, PPTX, CSV, XLSX, and images (OCR).
     """
     # Ensure storage directory exists
     storage_dir = f"app/file_storage/{user_id}"
@@ -44,12 +90,47 @@ async def upload_file(
 
     # Extract text
     text = ""
-    if file.filename.endswith(".pdf"):
-        reader = PdfReader(file_path)
-        text = " ".join([page.extract_text() for page in reader.pages if page.extract_text()])
-    else:
-        with open(file_path, "r", errors="ignore") as f:
-            text = f.read()
+    filename_lower = file.filename.lower()
+    
+    try:
+        if filename_lower.endswith(".pdf"):
+            from PyPDF2 import PdfReader
+            reader = PdfReader(file_path)
+            text = " ".join([page.extract_text() for page in reader.pages if page.extract_text()])
+        
+        elif filename_lower.endswith(".txt"):
+            with open(file_path, "r", errors="ignore") as f:
+                text = f.read()
+
+        elif filename_lower.endswith(".docx"):
+            doc = Document(file_path)
+            text = " ".join([para.text for para in doc.paragraphs])
+
+        elif filename_lower.endswith(".pptx"):
+            prs = Presentation(file_path)
+            slides_text = []
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    if hasattr(shape, "text"):
+                        slides_text.append(shape.text)
+            text = " ".join(slides_text)
+
+        elif filename_lower.endswith((".csv", ".xlsx")):
+            if filename_lower.endswith(".csv"):
+                df = pd.read_csv(file_path)
+            else:
+                df = pd.read_excel(file_path)
+            text = df.astype(str).apply(lambda x: " ".join(x), axis=1).str.cat(sep=" ")
+
+        elif filename_lower.endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp")):
+            image = Image.open(file_path)
+            text = pytesseract.image_to_string(image)
+
+        else:
+            return {"error": "Unsupported file type"}
+    
+    except Exception as e:
+        return {"error": f"Failed to extract text: {str(e)}"}
 
     # Chunk + store (user-specific)
     chunks = chunk_text(text)
@@ -61,14 +142,6 @@ async def upload_file(
         "source": file.filename,
         "user_id": user_id
     }
-
-# /*
-# curl -X POST "http://127.0.0.1:8000/upload-file" \
-#   -F "user_id=user123" \
-#   -F "file=@/path/to/example.pdf"
-# */
-
-
 
 # ----------------------------
 # Chat endpoint (user-specific)
@@ -125,17 +198,6 @@ Please answer my question using ONLY the information above. If the answer isn't 
         "sources": [src['source'] for src in sources],
         "user_id": request.user_id
     }
-
-
-# {
-#   "user_id": "user123",
-#   "query": "What is mentioned about the first chunk?"
-# }
-# curl -X POST "http://127.0.0.1:8000/chat" \
-#   -H "Content-Type: application/json" \
-#   -d '{"user_id": "user123", "query": "What is mentioned about the first chunk?"}'
-
-
 
 
 # ----------------------------
@@ -218,112 +280,3 @@ def verify_otp(req: VerifyRequest):
         return {"status": "success", "message": "OTP verified"}
     else:
         raise HTTPException(status_code=400, detail="Invalid OTP")
-
-
-
-
-# //OLD FILE CODE
-# import os
-# import uuid
-# from fastapi import FastAPI, UploadFile, File
-# from pydantic import BaseModel
-# from vector_store import add_document, search, embed_text
-
-# from cerebras.cloud.sdk import Cerebras
-# from PyPDF2 import PdfReader
-
-# app = FastAPI(title="Cerebras RAG AI Assistant")
-# client = Cerebras(api_key=os.environ.get("CEREBRAS_API_KEY"))
-
-# class ChatRequest(BaseModel):
-#     query: str
-
-# # Utility: split text into chunks
-# def chunk_text(text, chunk_size=500):
-#     return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
-
-# @app.post("/upload-file")
-# async def upload_file(file: UploadFile = File(...)):
-#     # Ensure storage directory exists
-#     storage_dir = "app/file_storage"
-#     os.makedirs(storage_dir, exist_ok=True)
-#     # Save file
-#     file_id = str(uuid.uuid4())
-#     file_path = os.path.join(storage_dir, f"{file_id}_{file.filename}")
-#     with open(file_path, "wb") as f:
-#         f.write(await file.read())
-
-#     # Extract text
-#     text = ""
-#     if file.filename.endswith(".pdf"):
-#         reader = PdfReader(file_path)
-#         text = " ".join([page.extract_text() for page in reader.pages if page.extract_text()])
-#     else:
-#         with open(file_path, "r", errors="ignore") as f:
-#             text = f.read()
-
-#     # Chunk + store
-#     chunks = chunk_text(text)
-#     add_document(file_id, chunks, source=file.filename)
-#     print("hgELLO")
-#     return {
-#         "message": "File uploaded and indexed",
-#         "file_id": file_id,
-#         "source": file.filename
-#     }
-
-# @app.post("/chat")
-# def chat(request: ChatRequest):
-#     # Search vector DB
-#     results = search(request.query, top_k=3)
-#     retrieved_docs = results["documents"][0]
-#     sources = results["metadatas"][0]
-
-#     context_text = "\n".join(
-#         [f"Source: {src['source']}\nContent: {doc}" for doc, src in zip(retrieved_docs, sources)]
-#     )
-
-#     # Enhanced system prompt
-#     SYSTEM_PROMPT = """
-#     You are a helpful and knowledgeable assistant. Your responses must follow these rules STRICTLY:
-
-#     **WHEN THE ANSWER IS IN THE CONTEXT:**
-#     - Provide a clear, specific answer using ONLY the information from the provided context
-#     - Always cite your source by mentioning which document the information came from
-#     - Write in a friendly, casual tone like a knowledgeable person explaining something
-#     - Be concise but thorough - give the complete answer found in the context
-
-#     **WHEN THE ANSWER IS NOT IN THE CONTEXT:**
-#     - DO NOT try to make up an answer or use outside knowledge
-#     - Politely state that you couldn't find the specific information in the provided documents
-#     - Offer a friendly suggestion for how the user might find the information
-#     - Keep it warm and human-like - don't sound robotic or apologetic
-
-#     **RESPONSE FORMAT EXAMPLES:**
-#     Good answer (when info exists):
-#     "Based on the project documentation, the API key should be stored in environment variables for security. The specific environment variable name is 'CEREBRAS_API_KEY'."
-
-#     Good non-answer (when info doesn't exist):
-#     "Thanks for your question! I've looked through the available documents, but I couldn't find specific information about that topic. You might want to check the official documentation or reach out to the support team for more detailed help."
-
-#     Remember: Your knowledge is limited to exactly what's in the provided context documents.
-#     """
-
-#     # In your chat function
-#     response = client.chat.completions.create(
-#         model="llama-4-scout-17b-16e-instruct",
-#         messages=[
-#             {"role": "system", "content": SYSTEM_PROMPT},
-#             {"role": "user", "content": f"""Here is my question: {request.query}
-
-#     Here are the documents I have for context:
-#     {context_text}
-
-#     Please answer my question using ONLY the information above. If the answer isn't there, just let me know politely."""}
-#         ]
-#     )
-
-#     return {
-#         "answer": response.choices[0].message.content,
-#         "sources": [src['source'] for src in sources]
-#     }
