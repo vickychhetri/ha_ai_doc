@@ -1,0 +1,13 @@
+services:
+  fastapi-app:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app
+      - ./app/file_storage:/app/file_storage
+      - ./app/chroma_db:/app/chroma_db
