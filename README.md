@@ -6,6 +6,9 @@ This guide explains how to set up, configure, and run the **RAG AI Assistant** l
 ## App
 https://github.com/vickychhetri/ha_ai_app
 
+## Demo
+https://www.youtube.com/watch?v=FQTvGXs-FTs
+
 ## 🧩 1. Prerequisites
 
 Before starting, ensure you have the following installed:
