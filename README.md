@@ -13,7 +13,18 @@ Before starting, ensure you have the following installed:
 - 🧠 **Cerebras API key** (for accessing the LLaMA model)
 - 📦 **Git** (for cloning the repository)
 
----
+Database 
+CREATE DATABASE IF NOT EXISTS `authdb`;
+USE `authdb`;
+CREATE TABLE IF NOT EXISTS `otps` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `email` varchar(255) NOT NULL,
+  `otp` varchar(10) NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+);
+
+
 
 ## 📁 2. Clone the Repository
 
