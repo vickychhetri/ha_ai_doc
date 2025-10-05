@@ -10,6 +10,10 @@ import random
 import string
 
 
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
 from docx import Document
 from pptx import Presentation
 import pandas as pd
@@ -227,6 +231,30 @@ class VerifyRequest(BaseModel):
 def generate_otp(length=6):
     return ''.join(random.choices(string.digits, k=length))
 
+def send_email(to_email: str, otp: str):
+    sender_email = os.getenv("EMAIL_USER", "")
+    sender_password =  os.getenv("EMAIL_PASS", "") 
+
+    subject = "Your OTP Code"
+    body = f"Your One-Time Password (OTP) is: {otp}\n\nIt will expire in 10 minutes."
+
+    msg = MIMEMultipart()
+    msg["From"] = sender_email
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+
+    try:
+        # Gmail SMTP setup
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()  # Secure the connection
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+            print(f"✅ OTP sent successfully to {to_email}")
+    except Exception as e:
+        print(f"❌ Error sending email: {e}")
+
+
 @app.post("/send-otp")
 def send_otp(req: OTPRequest):
     conn = get_db()
@@ -252,6 +280,8 @@ def send_otp(req: OTPRequest):
     conn.commit()
     cursor.close()
     conn.close()
+
+    send_email(req.email, otp)
 
     return {
         "status": "success",
