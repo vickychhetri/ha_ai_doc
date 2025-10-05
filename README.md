@@ -3,6 +3,8 @@
 This guide explains how to set up, configure, and run the **RAG AI Assistant** locally or in Docker.
 
 ---
+## App
+https://github.com/vickychhetri/ha_ai_app
 
 ## 🧩 1. Prerequisites
 
