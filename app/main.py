@@ -150,11 +150,74 @@ async def upload_file(
 # ----------------------------
 # Chat endpoint (user-specific)
 # ----------------------------
+# @app.post("/chat")
+# def chat(request: ChatRequest):
+#     """
+#     Search documents for the user and respond using Cerebras LLM.
+#     """
+#     # Search vector DB scoped to user
+#     results = search(request.user_id, request.query, top_k=3)
+#     retrieved_docs = results["documents"][0]
+#     sources = results["metadatas"][0]
+
+#     context_text = "\n".join(
+#         [f"Source: {src['source']}\nContent: {doc}" for doc, src in zip(retrieved_docs, sources)]
+#     )
+
+#     # System prompt
+#     SYSTEM_PROMPT = """
+# You are a helpful and knowledgeable assistant. Your responses must follow these rules STRICTLY:
+
+# **WHEN THE ANSWER IS IN THE CONTEXT:**
+# - Provide a clear, specific answer using ONLY the information from the provided context
+# - Always cite your source by mentioning which document the information came from
+# - Write in a friendly, casual tone like a knowledgeable person explaining something
+# - Be concise but thorough - give the complete answer found in the context
+
+# **WHEN THE ANSWER IS NOT IN THE CONTEXT:**
+# - DO NOT try to make up an answer or use outside knowledge
+# - Politely state that you couldn't find the specific information in the provided documents
+# - Offer a friendly suggestion for how the user might find the information
+# - Keep it warm and human-like - don't sound robotic or apologetic
+
+# Remember: Your knowledge is limited to exactly what's in the provided context documents.
+# """
+
+#     # Cerebras chat call
+#     response = client.chat.completions.create(
+#         model="llama-4-scout-17b-16e-instruct",
+#         messages=[
+#             {"role": "system", "content": SYSTEM_PROMPT},
+#             {"role": "user", "content": f"""Here is my question: {request.query}
+
+# Here are the documents I have for context:
+# {context_text}
+
+# Please answer my question using ONLY the information above. If the answer isn't there, just let me know politely."""}
+#         ]
+#     )
+
+#     return {
+#         "answer": response.choices[0].message.content,
+#         "sources": [src['source'] for src in sources],
+#         "user_id": request.user_id
+#     }
+
+
 @app.post("/chat")
 def chat(request: ChatRequest):
     """
     Search documents for the user and respond using Cerebras LLM.
     """
+    # Check if the query is a greeting or casual conversation
+    greeting_keywords = ["hello", "hi", "hey", "good morning", "good afternoon", "good evening", 
+                        "how are you", "what's up", "hey there", "hi there"]
+    
+    is_greeting = any(keyword in request.query.lower() for keyword in greeting_keywords)
+    
+    if is_greeting:
+        return handle_greeting(request.query, request.user_id)
+    
     # Search vector DB scoped to user
     results = search(request.user_id, request.query, top_k=3)
     retrieved_docs = results["documents"][0]
@@ -180,6 +243,11 @@ You are a helpful and knowledgeable assistant. Your responses must follow these 
 - Offer a friendly suggestion for how the user might find the information
 - Keep it warm and human-like - don't sound robotic or apologetic
 
+**FOR GREETINGS AND CASUAL CONVERSATION:**
+- Be warm, friendly, and engaging
+- Keep it brief but personable
+- Naturally transition to offering help with their questions
+
 Remember: Your knowledge is limited to exactly what's in the provided context documents.
 """
 
@@ -203,6 +271,39 @@ Please answer my question using ONLY the information above. If the answer isn't 
         "user_id": request.user_id
     }
 
+
+def handle_greeting(query: str, user_id: str):
+    """Handle greetings and casual conversation without document search"""
+    
+    greeting_responses = [
+        "Hi there! 👋 I'm here to help you find information from your documents. What can I help you with today?",
+        "Hello! 😊 I'm ready to search through your documents and answer your questions. What would you like to know?",
+        "Hey! Great to see you. I'm here to help you find information - just ask me anything about your documents!",
+        "Hi! I'm your document assistant. I can search through your files and answer questions based on them. What would you like to know?"
+    ]
+    
+    # More specific responses for certain greetings
+    query_lower = query.lower()
+    if "how are you" in query_lower:
+        response = "I'm doing great, thanks for asking! 😊 Ready to help you find information from your documents. What can I help you with?"
+    elif "what's up" in query_lower or "sup" in query_lower:
+        response = "Not much! Just here and ready to search your documents for you. What information are you looking for?"
+    elif "good morning" in query_lower:
+        response = "Good morning! ☀️ Hope you're having a great start to your day. What can I help you find in your documents?"
+    elif "good afternoon" in query_lower:
+        response = "Good afternoon! 😊 Ready to help you find whatever information you need from your documents."
+    elif "good evening" in query_lower:
+        response = "Good evening! 🌙 I'm here to help you search through your documents. What would you like to know?"
+    else:
+        # Random selection from general greetings
+        import random
+        response = random.choice(greeting_responses)
+    
+    return {
+        "answer": response,
+        "sources": [],
+        "user_id": user_id
+    }
 
 # ----------------------------
 # Database Connection
