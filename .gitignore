@@ -1,0 +1,22 @@
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# SQLite database files
+*.sqlite3
+*.db
+
+# Dockerfile changes (optional, if you want to ignore temporary edits)
+# app/Dockerfile
+
+# File storage / uploads
+app/app/file_storage/
+app/app/chroma_db/*/
+# Exclude directories but keep the folder itself
+!.gitkeep
+
+# OS generated files
+.DS_Store
+Thumbs.db
