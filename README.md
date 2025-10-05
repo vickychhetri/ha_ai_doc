@@ -17,9 +17,9 @@ Before starting, ensure you have the following installed:
 
 ## 📁 2. Clone the Repository
 
-```bash
 git clone url
 cd folder
+
 
 docker-compose up --build
 
@@ -60,8 +60,6 @@ Each user has an **isolated vector database**, ensuring data privacy and context
 3️⃣ Ask query → generate embedding → search vector DB → retrieve top chunks
 4️⃣ Feed retrieved context to Meta LLaMA via Cerebras → generate AI answer with sources
 
-
-
 ---
 
 ## 🧩 Architecture  
@@ -84,38 +82,3 @@ v
 - **PyPDF2** → Extracts text from uploaded PDFs  
 - **Sentence Transformers (MiniLM-L6-v2)** → Generates embeddings for semantic search  
 - **Cerebras SDK + Meta LLaMA 17B** → Produces contextual answers  
-
----
-
-## 🐳 Docker Setup  
-
-### Dockerfile  
-
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y build-essential libglib2.0-0 libsm6 libxrender1 libxext6 && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements
-COPY app/requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY app/ .
-
-# Create directories
-RUN mkdir -p /app/file_storage /app/chroma_db
-
-EXPOSE 8080
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
-
-## Run with Docker
-# Build the image
-docker build -t rag-ai-assistant .
-
-# Run the container
-docker run -d -p 8080:8080 rag-ai-assistant
-
